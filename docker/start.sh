@@ -58,8 +58,17 @@ if [ "$TABLE_CHECK" -eq "0" ]; then
   mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" < /var/www/backend/database/wave_db.sql \
     && echo "Schema imported successfully." \
     || echo "Schema import failed — check logs."
+fi
+
+# Import seed data if categories table is empty
+SEED_CHECK=$(mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" -e "SELECT COUNT(*) FROM categories;" 2>/dev/null | tail -1)
+if [ "$SEED_CHECK" = "0" ] || [ -z "$SEED_CHECK" ]; then
+  echo "Importing seed data..."
+  mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" < /var/www/backend/database/seed.sql \
+    && echo "Seed data imported successfully." \
+    || echo "Seed import failed — check logs."
 else
-  echo "Database already initialised — skipping import."
+  echo "Seed data already present — skipping."
 fi
 
 exec nginx -g 'daemon off;'
