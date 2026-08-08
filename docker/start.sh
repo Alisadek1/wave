@@ -52,10 +52,11 @@ for i in $(seq 1 30); do
   sleep 1
 done
 
-TABLE_CHECK=$(mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" "$DB_N" -e "SHOW TABLES LIKE 'users';" 2>/dev/null | wc -l)
+# wave_db.sql creates its own database (wave_db) so check there directly
+TABLE_CHECK=$(mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -e "SHOW TABLES IN wave_db LIKE 'users';" 2>/dev/null | wc -l)
 if [ "$TABLE_CHECK" -eq "0" ]; then
   echo "First boot — importing database schema..."
-  mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" "$DB_N" < /var/www/backend/database/wave_db.sql \
+  mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" < /var/www/backend/database/wave_db.sql \
     && echo "Schema imported successfully." \
     || echo "Schema import failed — check logs."
 else
