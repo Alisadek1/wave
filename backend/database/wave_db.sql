@@ -1,16 +1,11 @@
 -- =============================================
 -- WAVE — WOMEN'S ACCESSORIES STORE
--- Drop & recreate wave_db cleanly
 -- =============================================
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 SET time_zone = "+00:00";
 SET FOREIGN_KEY_CHECKS = 0;
 SET NAMES utf8mb4;
-
-DROP DATABASE IF EXISTS `wave_db`;
-CREATE DATABASE `wave_db` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE `wave_db`;
 
 -- =============================================
 -- SETTINGS

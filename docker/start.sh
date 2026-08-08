@@ -13,7 +13,7 @@ APP_TIMEZONE=UTC
 APP_BASE_PATH=${APP_BASE_PATH:-none}
 DB_HOST=${DB_HOST:-127.0.0.1}
 DB_PORT=${DB_PORT:-3306}
-DB_NAME=${DB_NAME:-pharm_db}
+DB_NAME=${DB_NAME:-railway}
 DB_USER=${DB_USER:-root}
 DB_PASS=${DB_PASS:-}
 JWT_SECRET=${JWT_SECRET:-change-me-in-production}
@@ -52,11 +52,10 @@ for i in $(seq 1 30); do
   sleep 1
 done
 
-# wave_db.sql creates its own database (wave_db) so check there directly
-TABLE_CHECK=$(mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -e "SHOW TABLES IN wave_db LIKE 'users';" 2>/dev/null | wc -l)
+TABLE_CHECK=$(mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" -e "SHOW TABLES LIKE 'users';" 2>/dev/null | wc -l)
 if [ "$TABLE_CHECK" -eq "0" ]; then
-  echo "First boot — importing database schema..."
-  mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" < /var/www/backend/database/wave_db.sql \
+  echo "First boot — importing database schema into $DB_N..."
+  mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" < /var/www/backend/database/wave_db.sql \
     && echo "Schema imported successfully." \
     || echo "Schema import failed — check logs."
 else
