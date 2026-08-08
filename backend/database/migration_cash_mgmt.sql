@@ -1,6 +1,4 @@
 -- Cash Management Refactor Migration
--- Run once on wave_db
-USE wave_db;
 
 -- ── 1. Extend shifts table ──────────────────────────────────────
 ALTER TABLE `shifts`

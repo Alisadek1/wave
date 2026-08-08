@@ -60,6 +60,13 @@ if [ "$TABLE_CHECK" -eq "0" ]; then
     || echo "Schema import failed — check logs."
 fi
 
+# Always run migrations (idempotent — CREATE TABLE IF NOT EXISTS)
+echo "Running migrations..."
+mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" < /var/www/backend/database/migration_wave.sql 2>/dev/null \
+  && echo "migration_wave.sql done." || echo "migration_wave.sql had warnings (may be normal)."
+mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" < /var/www/backend/database/migration_cash_mgmt.sql 2>/dev/null \
+  && echo "migration_cash_mgmt.sql done." || echo "migration_cash_mgmt.sql had warnings (may be normal)."
+
 # Import seed data if categories table is empty
 SEED_CHECK=$(mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" -e "SELECT COUNT(*) FROM categories;" 2>/dev/null | tail -1)
 if [ "$SEED_CHECK" = "0" ] || [ -z "$SEED_CHECK" ]; then

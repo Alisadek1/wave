@@ -1,5 +1,4 @@
 -- Wave DB migration: add shifts, expenses, price history + permissions
-USE wave_db;
 
 CREATE TABLE IF NOT EXISTS `expense_categories` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -81,7 +80,7 @@ CREATE TABLE IF NOT EXISTS `medicine_price_history` (
 -- Add shift_id column to sales if missing
 SET @col_exists = (
   SELECT COUNT(*) FROM information_schema.COLUMNS
-  WHERE TABLE_SCHEMA = 'wave_db' AND TABLE_NAME = 'sales' AND COLUMN_NAME = 'shift_id'
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sales' AND COLUMN_NAME = 'shift_id'
 );
 SET @sql = IF(@col_exists = 0,
   'ALTER TABLE `sales` ADD COLUMN `shift_id` INT UNSIGNED DEFAULT NULL',
