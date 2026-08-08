@@ -60,6 +60,11 @@ if [ "$TABLE_CHECK" -eq "0" ]; then
     || echo "Schema import failed — check logs."
 fi
 
+# Update currency to EGP if still set to SAR
+mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" -e \
+  "UPDATE settings SET value='EGP' WHERE \`key\`='currency' AND value='SAR';
+   UPDATE settings SET value='ج.م' WHERE \`key\`='currency_symbol' AND value='ر.س';" 2>/dev/null
+
 # Always run migrations (idempotent — CREATE TABLE IF NOT EXISTS)
 echo "Running migrations..."
 mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" < /var/www/backend/database/migration_wave.sql 2>/dev/null \
