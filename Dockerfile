@@ -28,6 +28,7 @@ RUN apt-get update && apt-get install -y \
     php8.2-bcmath \
     php8.2-curl \
     gettext-base \
+    default-mysql-client \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # nginx config (uses $PORT via envsubst at runtime)

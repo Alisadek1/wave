@@ -36,11 +36,28 @@ echo "php-fpm started, socket:"
 ls -la /run/php/
 
 # Auto-import schema on first boot (when users table doesn't exist)
-MYSQL_CMD="mysql -h ${DB_HOST:-127.0.0.1} -P ${DB_PORT:-3306} -u ${DB_USER:-root} -p${DB_PASS} ${DB_NAME:-railway}"
-TABLE_CHECK=$($MYSQL_CMD -e "SHOW TABLES LIKE 'users';" 2>/dev/null | wc -l)
+DB_H="${DB_HOST:-127.0.0.1}"
+DB_P="${DB_PORT:-3306}"
+DB_U="${DB_USER:-root}"
+DB_W="${DB_PASS:-}"
+DB_N="${DB_NAME:-railway}"
+
+# Wait up to 30s for MySQL to be reachable
+echo "Waiting for MySQL at $DB_H:$DB_P..."
+for i in $(seq 1 30); do
+  if mysqladmin ping -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" --silent 2>/dev/null; then
+    echo "MySQL is ready."
+    break
+  fi
+  sleep 1
+done
+
+TABLE_CHECK=$(mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" "$DB_N" -e "SHOW TABLES LIKE 'users';" 2>/dev/null | wc -l)
 if [ "$TABLE_CHECK" -eq "0" ]; then
   echo "First boot — importing database schema..."
-  $MYSQL_CMD < /var/www/backend/database/wave_db.sql && echo "Schema imported successfully." || echo "Schema import failed."
+  mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" "$DB_N" < /var/www/backend/database/wave_db.sql \
+    && echo "Schema imported successfully." \
+    || echo "Schema import failed — check logs."
 else
   echo "Database already initialised — skipping import."
 fi
