@@ -8,16 +8,27 @@ export function AuthProvider({ children }) {
   const [permissions, setPerms]   = useState([])
   const [loading, setLoading]     = useState(true)
 
+  const fetchSettings = useCallback(async () => {
+    try {
+      const res = await api.get('/api/settings')
+      const s = {}
+      ;(res.data.data || []).forEach(item => { s[item.key] = item.value })
+      if (s.currency_symbol) localStorage.setItem('currency_symbol', s.currency_symbol)
+      if (s.currency)        localStorage.setItem('currency_code', s.currency)
+    } catch {}
+  }, [])
+
   const fetchMe = useCallback(async () => {
     try {
       const res = await api.get('/api/users/me')
       setUser(res.data.data)
       setPerms(res.data.data.permissions || [])
+      fetchSettings()
     } catch {
       setUser(null)
       setPerms([])
     }
-  }, [])
+  }, [fetchSettings])
 
   useEffect(() => {
     const token = localStorage.getItem('access_token')

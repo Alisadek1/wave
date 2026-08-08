@@ -68,6 +68,8 @@ export default function SettingsPage() {
       Object.entries(settings).forEach(([k, v]) => { if (v !== undefined && v !== null) fd.append(k, v) })
       if (logoFile) fd.append('logo', logoFile)
       await api.post('/api/settings', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      if (settings.currency_symbol) localStorage.setItem('currency_symbol', settings.currency_symbol)
+      if (settings.currency)        localStorage.setItem('currency_code', settings.currency)
       toast.success(t('settings.saved'))
       setLogoFile(null)
     } catch (err) {

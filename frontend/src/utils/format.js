@@ -2,6 +2,8 @@ import i18n from '../i18n/index.js'
 
 const getLocale = () => i18n.language === 'ar' ? 'ar-SA' : 'en-GB'
 
+const getSymbol = () => localStorage.getItem('currency_symbol') || 'ج.م'
+
 export const formatCurrency = (amount, abbreviated = false) => {
   const num = parseFloat(amount || 0)
   if (abbreviated) {
@@ -9,8 +11,9 @@ export const formatCurrency = (amount, abbreviated = false) => {
     if (Math.abs(num) >= 1000) return `${(num / 1000).toFixed(1)}K`
     return num.toFixed(0)
   }
-  if (num < 0) return `-ر.س ${Math.abs(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-  return `ر.س ${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const sym = getSymbol()
+  if (num < 0) return `-${sym} ${Math.abs(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return `${sym} ${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 export const formatDate = (date) => {
