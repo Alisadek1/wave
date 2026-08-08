@@ -112,3 +112,20 @@ SELECT r.id, p.id
 FROM roles r
 JOIN permissions p ON p.name IN ('expenses.view','expenses.create','shifts.view')
 WHERE r.name IN ('pharmacist', 'cashier');
+
+-- Add missing columns to purchase_items if not present
+SET @col1 = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'purchase_items' AND COLUMN_NAME = 'public_price');
+SET @sql1 = IF(@col1 = 0, 'ALTER TABLE `purchase_items` ADD COLUMN `public_price` DECIMAL(10,3) NOT NULL DEFAULT 0.000 AFTER `selling_price`', 'SELECT 1');
+PREPARE stmt FROM @sql1; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col2 = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'purchase_items' AND COLUMN_NAME = 'tax_rate');
+SET @sql2 = IF(@col2 = 0, 'ALTER TABLE `purchase_items` ADD COLUMN `tax_rate` DECIMAL(5,2) NOT NULL DEFAULT 0.00 AFTER `public_price`', 'SELECT 1');
+PREPARE stmt FROM @sql2; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col3 = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'purchase_items' AND COLUMN_NAME = 'tax_amount');
+SET @sql3 = IF(@col3 = 0, 'ALTER TABLE `purchase_items` ADD COLUMN `tax_amount` DECIMAL(12,3) NOT NULL DEFAULT 0.000 AFTER `tax_rate`', 'SELECT 1');
+PREPARE stmt FROM @sql3; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col4 = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'purchase_items' AND COLUMN_NAME = 'remaining_quantity');
+SET @sql4 = IF(@col4 = 0, 'ALTER TABLE `purchase_items` ADD COLUMN `remaining_quantity` INT NOT NULL DEFAULT 0 AFTER `tax_amount`', 'SELECT 1');
+PREPARE stmt FROM @sql4; EXECUTE stmt; DEALLOCATE PREPARE stmt;
