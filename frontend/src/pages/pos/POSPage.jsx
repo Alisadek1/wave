@@ -12,7 +12,6 @@ import toast from 'react-hot-toast'
 import api from '../../services/api'
 import { useTranslation } from 'react-i18next'
 
-const TAX_RATE = 15
 
 export default function POSPage() {
   const { t } = useTranslation()
@@ -37,7 +36,6 @@ export default function POSPage() {
   const [customerResults, setCustResults] = useState([])
   const [discountType, setDiscType] = useState('fixed')
   const [discountValue, setDiscVal] = useState(0)
-  const [taxEnabled, setTaxEnabled] = useState(true)
   const [loyaltyToUse, setLoyalty] = useState(0)
   const [payMethod, setPayMethod] = useState('cash')
   const [cashAmount, setCashAmount] = useState('')
@@ -148,9 +146,8 @@ export default function POSPage() {
   const subtotal = cart.reduce((s, i) => s + (i.unit_price * i.quantity) - i.discount_amount, 0)
   const discAmt  = discountType === 'percentage' ? subtotal * discountValue / 100 : parseFloat(discountValue || 0)
   const afterDisc = subtotal - discAmt
-  const taxAmt   = taxEnabled ? afterDisc * TAX_RATE / 100 : 0
   const loyaltyDiscount = loyaltyToUse * 0.01 // 1 point = 0.01 SAR
-  const total    = Math.max(0, afterDisc + taxAmt - loyaltyDiscount)
+  const total    = Math.max(0, afterDisc - loyaltyDiscount)
 
   const change   = (() => {
     const paid = (parseFloat(cashAmount || 0)) + (parseFloat(visaAmount || 0)) + (parseFloat(walletAmount || 0))
@@ -227,7 +224,7 @@ export default function POSPage() {
         customer_id: customer?.id || '',
         discount_type: discountType,
         discount_value: discountValue,
-        tax_rate: taxEnabled ? TAX_RATE : 0,
+        tax_rate: 0,
         loyalty_points_used: loyaltyToUse,
         payment_method: payMethod,
         cash_amount: parseFloat(cashAmount || 0),
@@ -470,21 +467,12 @@ export default function POSPage() {
           </div>
         </div>
 
-        {/* Tax */}
-        <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={taxEnabled} onChange={e => setTaxEnabled(e.target.checked)} className="rounded" />
-            <span className="text-sm text-gray-700 dark:text-gray-300">{t('pos.apply_tax')}</span>
-          </label>
-        </div>
-
         {/* Summary */}
         <div className="px-4 py-3 space-y-1.5 text-sm border-b border-gray-100 dark:border-gray-700">
           <div className="flex justify-between text-gray-500">
             <span>{t('common.subtotal')}</span><span>{formatCurrency(subtotal)}</span>
           </div>
           {discAmt > 0 && <div className="flex justify-between text-red-500"><span>{t('common.discount')}</span><span>− {formatCurrency(discAmt)}</span></div>}
-          {taxAmt > 0 && <div className="flex justify-between text-gray-500"><span>{t('common.tax')} (15%)</span><span>{formatCurrency(taxAmt)}</span></div>}
           {loyaltyDiscount > 0 && <div className="flex justify-between text-green-500"><span>{t('pos.loyalty_discount')}</span><span>− {formatCurrency(loyaltyDiscount)}</span></div>}
           <div className="flex justify-between font-bold text-xl pt-2 border-t border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white">
             <span>{t('common.total').toUpperCase()}</span><span>{formatCurrency(total)}</span>
@@ -648,7 +636,6 @@ export default function POSPage() {
               ))}
               <hr className="hr" />
               {lastSale.discount_amount > 0 && <div className="row"><span>{t('pos.receipt_discount')}</span><span>- {formatCurrency(lastSale.discount_amount)}</span></div>}
-              {lastSale.tax_amount > 0 && <div className="row"><span>{t('pos.receipt_vat', { rate: lastSale.tax_rate })}</span><span>{formatCurrency(lastSale.tax_amount)}</span></div>}
               <div className="total-row"><span>{t('pos.receipt_total')}</span><span>{formatCurrency(lastSale.total)}</span></div>
               {lastSale.change_amount > 0 && <div className="row"><span>{t('pos.receipt_change')}</span><span>{formatCurrency(lastSale.change_amount)}</span></div>}
               <hr className="hr" />
