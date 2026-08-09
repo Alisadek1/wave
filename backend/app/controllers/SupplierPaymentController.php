@@ -4,12 +4,31 @@ declare(strict_types=1);
 
 class SupplierPaymentController
 {
+    private function ensureTable(): void
+    {
+        $db = Database::getInstance();
+        $db->exec("CREATE TABLE IF NOT EXISTS supplier_payments (
+            id INT PRIMARY KEY AUTO_INCREMENT,
+            supplier_id INT NOT NULL,
+            user_id INT NOT NULL,
+            amount DECIMAL(10,3) NOT NULL,
+            payment_date DATE NOT NULL,
+            payment_method VARCHAR(50) DEFAULT 'cash',
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_supplier (supplier_id),
+            FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
     public function index(array $params): void
     {
         $user = AuthMiddleware::handle();
         AuthMiddleware::require($user, 'suppliers.view');
 
         $supplierId = (int)$params['supplier_id'];
+        $this->ensureTable();
         $db      = Database::getInstance();
         $page    = max(1, (int)($_GET['page'] ?? 1));
         $perPage = min(50, max(10, (int)($_GET['per_page'] ?? 15)));
@@ -45,6 +64,7 @@ class SupplierPaymentController
 
         $supplierId = (int)$params['supplier_id'];
         $body       = $_POST;
+        $this->ensureTable();
         $db         = Database::getInstance();
 
         $check = $db->prepare("SELECT * FROM suppliers WHERE id = ?");
@@ -97,6 +117,7 @@ class SupplierPaymentController
 
         $supplierId = (int)$params['supplier_id'];
         $paymentId  = (int)$params['id'];
+        $this->ensureTable();
         $db         = Database::getInstance();
 
         $stmt = $db->prepare("SELECT * FROM supplier_payments WHERE id = ? AND supplier_id = ?");
