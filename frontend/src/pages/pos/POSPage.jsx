@@ -46,7 +46,6 @@ export default function POSPage() {
   // Search
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
-  const [barcodeInput, setBarcodeInput] = useState('')
   const [heldInvoices, setHeldInvoices] = useState([])
   const [modal, setModal]         = useState(null)
   const [processing, setProcessing] = useState(false)
@@ -54,11 +53,10 @@ export default function POSPage() {
   const [addCustForm, setAddCustForm] = useState({ name: '', phone: '' })
   const [addCustSaving, setAddCustSaving] = useState(false)
 
-  const barcodeRef = useRef(null)
-  const searchRef  = useRef(null)
+  const searchRef = useRef(null)
 
-  // Focus barcode on mount
-  useEffect(() => { barcodeRef.current?.focus() }, [])
+  // Focus search on mount
+  useEffect(() => { searchRef.current?.focus() }, [])
 
   // Search medicines
   useEffect(() => {
@@ -85,16 +83,16 @@ export default function POSPage() {
   }, [])
   useEffect(() => { loadHeld() }, [loadHeld])
 
-  // Barcode lookup
-  const handleBarcodeScan = async (e) => {
-    if (e.key !== 'Enter' || !barcodeInput.trim()) return
+  // Enter = barcode lookup; typing = name search
+  const handleSearchKeyDown = async (e) => {
+    if (e.key !== 'Enter' || !searchQuery.trim()) return
     try {
-      const res = await get(`/api/pos/barcode/${encodeURIComponent(barcodeInput.trim())}`)
+      const res = await get(`/api/pos/barcode/${encodeURIComponent(searchQuery.trim())}`)
       addToCart(res.data)
-      setBarcodeInput('')
+      setSearchQuery('')
+      setSearchResults([])
     } catch {
-      toast.error(t('pos.medicine_not_found', { barcode: barcodeInput }))
-      setBarcodeInput('')
+      // not a barcode — keep results visible
     }
   }
 
@@ -124,7 +122,7 @@ export default function POSPage() {
       }]
     })
     setSearchQuery(''); setSearchResults([])
-    barcodeRef.current?.focus()
+    searchRef.current?.focus()
   }
 
   const updateQty = (medicineId, qty) => {
@@ -275,30 +273,19 @@ export default function POSPage() {
       {/* Left: Products */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Search bar */}
-        <div className="p-4 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 space-y-3">
-          {/* Barcode scanner */}
-          <div className="relative">
-            <input
-              ref={barcodeRef}
-              value={barcodeInput}
-              onChange={e => setBarcodeInput(e.target.value)}
-              onKeyDown={handleBarcodeScan}
-              className="input pe-10 font-mono"
-              placeholder={t('pos.scan_barcode')}
-            />
-            <span className="absolute end-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">⏎</span>
-          </div>
-
-          {/* Name search */}
+        <div className="p-4 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
           <div className="relative">
             <MagnifyingGlassIcon className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               ref={searchRef}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="input ps-9"
+              onKeyDown={handleSearchKeyDown}
+              className="input ps-9 pe-10"
               placeholder={t('pos.search_medicine')}
+              autoComplete="off"
             />
+            <span className="absolute end-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">⏎</span>
             {searchResults.length > 0 && (
               <div className="absolute top-full start-0 end-0 z-20 mt-1 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 max-h-72 overflow-y-auto">
                 {searchResults.map(med => (
