@@ -160,13 +160,7 @@ function MedicineForm({ initial, categories, companies, onSubmit, loading }) {
 
       <div><label className="label">{t('common.description')}</label><textarea value={form.description} onChange={e => set('description', e.target.value)} rows={2} className="input resize-none" /></div>
 
-      {initial && (
-        <div>
-          <label className="label">{t('medicines.price_change_reason')}</label>
-          <textarea value={form.price_change_reason || ''} onChange={e => set('price_change_reason', e.target.value)}
-            rows={2} placeholder={t('medicines.price_change_reason_hint')} className="input resize-none" />
-        </div>
-      )}
+
       <div className="flex gap-6">
         <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={!!form.is_active} onChange={e => set('is_active', e.target.checked)} className="rounded" />
