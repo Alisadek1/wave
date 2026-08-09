@@ -8,17 +8,15 @@ class SupplierPaymentController
     {
         $db = Database::getInstance();
         $db->exec("CREATE TABLE IF NOT EXISTS supplier_payments (
-            id INT PRIMARY KEY AUTO_INCREMENT,
-            supplier_id INT NOT NULL,
-            user_id INT NOT NULL,
+            id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+            supplier_id BIGINT UNSIGNED NOT NULL,
+            user_id BIGINT UNSIGNED NOT NULL,
             amount DECIMAL(10,3) NOT NULL,
             payment_date DATE NOT NULL,
             payment_method VARCHAR(50) DEFAULT 'cash',
             notes TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_supplier (supplier_id),
-            FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE,
-            FOREIGN KEY (user_id) REFERENCES users(id)
+            INDEX idx_supplier (supplier_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 
