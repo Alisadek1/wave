@@ -46,6 +46,7 @@ export default function POSPage() {
   // Search
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
+  const [highlightedIdx, setHighlightedIdx] = useState(-1)
   const [heldInvoices, setHeldInvoices] = useState([])
   const [modal, setModal]         = useState(null)
   const [processing, setProcessing] = useState(false)
@@ -60,10 +61,12 @@ export default function POSPage() {
 
   // Search medicines
   useEffect(() => {
-    if (searchQuery.length < 2) { setSearchResults([]); return }
+    if (searchQuery.length < 2) { setSearchResults([]); setHighlightedIdx(-1); return }
     const t = setTimeout(async () => {
       const res = await get('/api/medicines/search', { q: searchQuery }, { silent: true })
-      setSearchResults(res.data || [])
+      const data = res.data || []
+      setSearchResults(data)
+      setHighlightedIdx(data.length ? 0 : -1)
     }, 300)
     return () => clearTimeout(t)
   }, [searchQuery])
@@ -83,16 +86,53 @@ export default function POSPage() {
   }, [])
   useEffect(() => { loadHeld() }, [loadHeld])
 
-  // Enter = barcode lookup; typing = name search
+  // ref filled in below after handleCheckout is defined
+  const checkoutRef = useRef(null)
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'F2') { e.preventDefault(); searchRef.current?.focus() }
+      if (e.key === 'F8') { e.preventDefault(); checkoutRef.current?.() }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [])
+
+  // Enter = select highlighted / barcode lookup; arrows = navigate results
   const handleSearchKeyDown = async (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setHighlightedIdx(i => Math.min(i + 1, searchResults.length - 1))
+      return
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setHighlightedIdx(i => Math.max(i - 1, 0))
+      return
+    }
+    if (e.key === 'Escape') {
+      setSearchResults([])
+      setHighlightedIdx(-1)
+      return
+    }
     if (e.key !== 'Enter' || !searchQuery.trim()) return
+
+    // If a result is highlighted, select it directly
+    if (searchResults.length > 0) {
+      const idx = highlightedIdx >= 0 ? highlightedIdx : (searchResults.length === 1 ? 0 : -1)
+      if (idx >= 0) {
+        addToCart(searchResults[idx])
+        setSearchQuery(''); setSearchResults([]); setHighlightedIdx(-1)
+        return
+      }
+    }
+
+    // Barcode scan fallback
     try {
       const res = await get(`/api/pos/barcode/${encodeURIComponent(searchQuery.trim())}`)
       addToCart(res.data)
-      setSearchQuery('')
-      setSearchResults([])
+      setSearchQuery(''); setSearchResults([]); setHighlightedIdx(-1)
     } catch {
-      // not a barcode — keep results visible
+      // not a barcode — keep results visible so user can pick with arrows
     }
   }
 
@@ -239,6 +279,7 @@ export default function POSPage() {
       toast.error(err.response?.data?.message || t('pos.sale_failed'))
     } finally { setProcessing(false) }
   }
+  checkoutRef.current = handleCheckout
 
   const printReceipt = () => {
     const el = document.getElementById('receipt-print-area')
@@ -288,11 +329,12 @@ export default function POSPage() {
             <span className="absolute end-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">⏎</span>
             {searchResults.length > 0 && (
               <div className="absolute top-full start-0 end-0 z-20 mt-1 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 max-h-72 overflow-y-auto">
-                {searchResults.map(med => (
+                {searchResults.map((med, i) => (
                   <button
                     key={med.id}
                     onClick={() => addToCart(med)}
-                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 text-start transition-colors"
+                    onMouseEnter={() => setHighlightedIdx(i)}
+                    className={`w-full flex items-center justify-between px-4 py-3 text-start transition-colors ${i === highlightedIdx ? 'bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700'}`}
                   >
                     <div>
                       <p className="font-medium text-sm text-gray-900 dark:text-white">{med.name}</p>

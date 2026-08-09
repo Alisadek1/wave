@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHandle } from 'react'
 import { PlusIcon, EyeIcon, TrashIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { useApi, usePagination } from '../../hooks/useApi'
 import Modal from '../../components/ui/Modal'
@@ -14,14 +14,18 @@ import { useTranslation } from 'react-i18next'
 
 /* ─── MedicineSearch per row ────────────────────────────── */
 
-function MedicineSearch({ value, onSelect, idx }) {
+const MedicineSearch = forwardRef(function MedicineSearch({ value, onSelect, onAfterSelect }, ref) {
   const { t } = useTranslation()
   const [query, setQuery] = useState(value?.name || '')
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(false)
   const [searching, setSearching] = useState(false)
+  const [highlightedIdx, setHighlightedIdx] = useState(-1)
   const timer = useRef(null)
   const wrapRef = useRef(null)
+  const inputRef = useRef(null)
+
+  useImperativeHandle(ref, () => ({ focus: () => inputRef.current?.focus() }), [])
 
   // Close on outside click
   useEffect(() => {
@@ -35,55 +39,88 @@ function MedicineSearch({ value, onSelect, idx }) {
     setSearching(true)
     try {
       const res = await api.get('/api/medicines/search', { params: { q, limit: 8 } })
-      setResults(res.data?.data || res.data || [])
+      const data = res.data?.data || res.data || []
+      setResults(data)
       setOpen(true)
+      setHighlightedIdx(data.length ? 0 : -1)
     } catch { setResults([]) } finally { setSearching(false) }
   }, [])
 
   const handleChange = (e) => {
     const q = e.target.value
     setQuery(q)
+    setHighlightedIdx(-1)
     clearTimeout(timer.current)
     timer.current = setTimeout(() => search(q), 250)
-  }
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      clearTimeout(timer.current)
-      search(query)
-    }
   }
 
   const pick = (med) => {
     setQuery(med.name)
     setOpen(false)
+    setHighlightedIdx(-1)
     onSelect(med)
+    onAfterSelect?.()
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      if (!open && results.length) setOpen(true)
+      setHighlightedIdx(i => Math.min(i + 1, results.length - 1))
+      return
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setHighlightedIdx(i => Math.max(i - 1, 0))
+      return
+    }
+    if (e.key === 'Escape') {
+      setOpen(false)
+      setHighlightedIdx(-1)
+      return
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      if (open && results.length) {
+        pick(results[highlightedIdx >= 0 ? highlightedIdx : 0])
+        return
+      }
+      clearTimeout(timer.current)
+      search(query)
+    }
   }
 
   return (
     <div ref={wrapRef} className="relative">
       <div className="relative">
         <input
+          ref={inputRef}
           value={query}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           onFocus={() => query && results.length && setOpen(true)}
           placeholder={t('purchases.search_placeholder')}
           className="input text-xs pe-7"
+          role="combobox"
+          aria-expanded={open}
+          aria-autocomplete="list"
         />
         <MagnifyingGlassIcon className={`absolute end-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${searching ? 'text-primary-500 animate-spin' : 'text-gray-300'}`} />
       </div>
       {open && (
-        <div className="absolute z-30 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl shadow-xl overflow-hidden text-xs">
-          {results.length ? results.map(m => (
+        <div className="absolute z-30 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl shadow-xl overflow-hidden text-xs" role="listbox">
+          {results.length ? results.map((m, i) => (
             <button
               key={m.id}
               type="button"
+              role="option"
+              aria-selected={i === highlightedIdx}
               onMouseDown={() => pick(m)}
-              className="w-full text-start px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-0"
+              onMouseEnter={() => setHighlightedIdx(i)}
+              className={`w-full text-start px-3 py-2 border-b border-gray-100 dark:border-gray-700 last:border-0 ${i === highlightedIdx ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300' : 'hover:bg-gray-50 dark:hover:bg-gray-700'}`}
             >
               <span className="font-medium">{m.name}</span>
+              {m.name_ar && <span className="ms-2 text-gray-500 dark:text-gray-400" dir="rtl">{m.name_ar}</span>}
               {m.barcode && <span className="ms-2 font-mono text-gray-400">{m.barcode}</span>}
               <span className="ms-2 text-primary-600">{formatCurrency(m.purchase_price)}</span>
             </button>
@@ -103,7 +140,7 @@ function MedicineSearch({ value, onSelect, idx }) {
       )}
     </div>
   )
-}
+})
 
 /* ─── Quick-add medicine modal ──────────────────────────── */
 
@@ -163,6 +200,27 @@ function PurchaseForm({ suppliers, onSubmit, loading }) {
   const [quickAdd, setQuickAdd] = useState(null) // { idx, query }
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
+  const medRefs = useRef({})
+  const fieldRefs = useRef({})
+
+  const handleItemEnter = useCallback((e, idx, field) => {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    const order = ['qty', 'purchase_price', 'public_price', 'tax_rate']
+    const pos = order.indexOf(field)
+    if (pos < order.length - 1) {
+      fieldRefs.current[`${idx}-${order[pos + 1]}`]?.focus()
+    } else {
+      if (medRefs.current[idx + 1]) {
+        medRefs.current[idx + 1].focus()
+      } else {
+        const nextIdx = idx + 1
+        setItems(it => [...it, { ...EMPTY_ITEM }])
+        setTimeout(() => medRefs.current[nextIdx]?.focus(), 50)
+      }
+    }
+  }, [])
+
   const addItem = () => setItems(it => [...it, { ...EMPTY_ITEM }])
   const removeItem = (idx) => setItems(it => it.filter((_, i) => i !== idx))
   const setItem = (idx, k, v) => setItems(it => it.map((item, i) => i === idx ? { ...item, [k]: v } : item))
@@ -209,7 +267,7 @@ function PurchaseForm({ suppliers, onSubmit, loading }) {
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} onKeyDown={e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); handleSubmit(e) } }} className="space-y-5">
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="label">{t('purchases.supplier')}</label>
@@ -241,32 +299,45 @@ function PurchaseForm({ suppliers, onSubmit, loading }) {
           <div className="space-y-2">
             {items.map((item, idx) => (
               <div key={idx} className="grid grid-cols-[2.5fr_0.8fr_1.2fr_1.2fr_1fr_auto] gap-2 items-center p-3 bg-gray-50 dark:bg-gray-700/30 rounded-xl">
-                <MedicineSearch value={item} onSelect={(m) => handleMedicineSelect(idx, m)} idx={idx} />
+                <MedicineSearch
+                  ref={el => { medRefs.current[idx] = el }}
+                  value={item}
+                  onSelect={(m) => handleMedicineSelect(idx, m)}
+                  onAfterSelect={() => fieldRefs.current[`${idx}-qty`]?.focus()}
+                />
 
                 <input
                   type="number" min="1"
+                  ref={el => { fieldRefs.current[`${idx}-qty`] = el }}
                   value={item.quantity}
                   onChange={e => setItem(idx, 'quantity', e.target.value)}
+                  onKeyDown={e => handleItemEnter(e, idx, 'qty')}
                   className="input text-xs text-center"
                 />
                 <input
                   type="number" step="any" min="0"
+                  ref={el => { fieldRefs.current[`${idx}-purchase_price`] = el }}
                   value={item.purchase_price}
                   onChange={e => setItem(idx, 'purchase_price', e.target.value)}
+                  onKeyDown={e => handleItemEnter(e, idx, 'purchase_price')}
                   className="input text-xs"
                 />
                 <input
                   type="number" step="any" min="0"
+                  ref={el => { fieldRefs.current[`${idx}-public_price`] = el }}
                   value={item.public_price}
                   onChange={e => setItem(idx, 'public_price', e.target.value)}
+                  onKeyDown={e => handleItemEnter(e, idx, 'public_price')}
                   className="input text-xs"
                   placeholder="0.000"
                 />
                 <div className="flex items-center gap-1">
                   <input
                     type="number" step="0.1" min="0" max="100"
+                    ref={el => { fieldRefs.current[`${idx}-tax_rate`] = el }}
                     value={item.tax_rate}
                     onChange={e => setItem(idx, 'tax_rate', e.target.value)}
+                    onKeyDown={e => handleItemEnter(e, idx, 'tax_rate')}
                     className="input text-xs w-14"
                   />
                   {item.purchase_price && item.quantity ? (
