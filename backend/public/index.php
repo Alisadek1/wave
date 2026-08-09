@@ -84,6 +84,20 @@ if ($basePath && $basePath !== 'none' && str_starts_with($uri, $basePath)) {
     $uri = substr($uri, strlen($basePath)) ?: '/';
 }
 
+// Global exception handler — returns JSON so the frontend shows the real error
+set_exception_handler(function (Throwable $e): void {
+    if (!headers_sent()) {
+        header('Content-Type: application/json');
+        http_response_code(500);
+    }
+    $debug = ($_ENV['APP_DEBUG'] ?? 'false') === 'true';
+    echo json_encode([
+        'ok'      => false,
+        'message' => $debug ? $e->getMessage() : 'Internal server error: ' . $e->getMessage(),
+        'file'    => $debug ? $e->getFile() . ':' . $e->getLine() : null,
+    ]);
+});
+
 // Load and dispatch routes
 $router = require __DIR__ . '/../app/routes/api.php';
 $router->dispatch($_SERVER['REQUEST_METHOD'], $uri);

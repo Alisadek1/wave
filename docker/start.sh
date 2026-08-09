@@ -72,6 +72,39 @@ mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" < /var/www/backend/d
 mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" < /var/www/backend/database/migration_cash_mgmt.sql 2>/dev/null \
   && echo "migration_cash_mgmt.sql done." || echo "migration_cash_mgmt.sql had warnings (may be normal)."
 
+# Ensure shift_cash_movements table exists (migration_cash_mgmt.sql may stop early on ALTER TABLE errors)
+TBL_CHECK=$(mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" -e "SHOW TABLES LIKE 'shift_cash_movements';" 2>/dev/null | wc -l)
+if [ "$TBL_CHECK" -eq "0" ]; then
+  echo "Creating shift_cash_movements table..."
+  mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" -e "
+    CREATE TABLE IF NOT EXISTS \`shift_cash_movements\` (
+      \`id\`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+      \`shift_id\`   INT UNSIGNED NOT NULL,
+      \`type\`       ENUM('cash_in','cash_out') NOT NULL,
+      \`amount\`     DECIMAL(12,3) NOT NULL,
+      \`reason\`     VARCHAR(255) DEFAULT NULL,
+      \`created_by\` INT UNSIGNED NOT NULL,
+      \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      KEY \`idx_cash_movements_shift\` (\`shift_id\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  " 2>/dev/null && echo "shift_cash_movements created." || echo "shift_cash_movements creation failed."
+else
+  echo "shift_cash_movements already exists — skipping."
+fi
+
+# Ensure shifts has the extended columns added by migration_cash_mgmt
+mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" -e "
+  ALTER TABLE \`shifts\`
+    ADD COLUMN IF NOT EXISTS \`expected_cash\`  DECIMAL(12,3) DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS \`counted_cash\`   DECIMAL(12,3) DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS \`difference\`     DECIMAL(12,3) DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS \`balance_status\` ENUM('balanced','overage','shortage') DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS \`cash_refunds\`   DECIMAL(12,3) NOT NULL DEFAULT 0.000,
+    ADD COLUMN IF NOT EXISTS \`cash_in_total\`  DECIMAL(12,3) NOT NULL DEFAULT 0.000,
+    ADD COLUMN IF NOT EXISTS \`cash_out_total\` DECIMAL(12,3) NOT NULL DEFAULT 0.000;
+" 2>/dev/null && echo "shifts columns ensured." || echo "shifts ALTER TABLE had warnings."
+
 # Add purchase_item_id to return_items if missing
 COL_CHECK=$(mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" -e "SHOW COLUMNS FROM return_items LIKE 'purchase_item_id';" 2>/dev/null | wc -l)
 if [ "$COL_CHECK" -eq "0" ]; then
