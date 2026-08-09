@@ -43,7 +43,7 @@ function MedicineForm({ initial, categories, companies, onSubmit, loading }) {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (!form.name.trim()) return toast.error(t('medicines.required_name'))
+    if (!form.name_ar.trim()) return toast.error(t('medicines.required_name_ar'))
     if (!form.public_price) return toast.error(t('medicines.required_price'))
 
     const fd = new FormData()
@@ -54,8 +54,8 @@ function MedicineForm({ initial, categories, companies, onSubmit, loading }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
-        <div><label className="label">{t('medicines.name_en')} *</label><input value={form.name} onChange={e => set('name', e.target.value)} className="input" required /></div>
-        <div><label className="label">{t('medicines.name_ar')}</label><input value={form.name_ar} onChange={e => set('name_ar', e.target.value)} className="input" dir="rtl" /></div>
+        <div><label className="label">{t('medicines.name_en')}</label><input value={form.name} onChange={e => set('name', e.target.value)} className="input" /></div>
+        <div><label className="label">{t('medicines.name_ar')} *</label><input value={form.name_ar} onChange={e => set('name_ar', e.target.value)} className="input" dir="rtl" required /></div>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div><label className="label">{t('medicines.barcode')}</label><input value={form.barcode} onChange={e => set('barcode', e.target.value)} className="input font-mono" /></div>

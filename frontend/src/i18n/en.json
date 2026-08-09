@@ -232,6 +232,7 @@
     "col_stock": "Stock",
     "no_medicines": "No products found",
     "required_name": "Product name is required",
+    "required_name_ar": "Arabic product name is required",
     "required_price": "Selling price is required",
     "updated": "Product updated",
     "added": "Product added",

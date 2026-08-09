@@ -232,6 +232,7 @@
     "col_stock": "المخزون",
     "no_medicines": "لا توجد منتجات",
     "required_name": "اسم المنتج مطلوب",
+    "required_name_ar": "الاسم العربي للمنتج مطلوب",
     "required_price": "سعر البيع مطلوب",
     "updated": "تم تحديث المنتج",
     "added": "تمت إضافة المنتج",
