@@ -72,7 +72,7 @@ class MedicineController
         $body = $_POST;
 
         $validator = Validator::make($body, [
-            'name'          => 'required|string|maxlength:200',
+            'name_ar'       => 'required|string|maxlength:200',
             'public_price'  => 'required|numeric|min:0',
             'purchase_price'=> 'required|numeric|min:0',
             'minimum_stock' => 'required|integer|min:0',
@@ -179,7 +179,7 @@ class MedicineController
         }
 
         $validator = Validator::make($body, [
-            'name'          => 'required|string|maxlength:200',
+            'name_ar'       => 'required|string|maxlength:200',
             'public_price'  => 'required|numeric|min:0',
             'purchase_price'=> 'required|numeric|min:0',
             'minimum_stock' => 'required|integer|min:0',
