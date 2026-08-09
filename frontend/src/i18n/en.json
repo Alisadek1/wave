@@ -207,7 +207,7 @@
     "count": "{{count}} products",
     "add": "Add Product",
     "update": "Update Product",
-    "name_en": "Name (EN) *",
+    "name_en": "Name (EN)",
     "name_ar": "Name (AR)",
     "barcode": "Barcode",
     "sku": "SKU",
