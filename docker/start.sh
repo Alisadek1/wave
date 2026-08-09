@@ -72,6 +72,17 @@ mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" < /var/www/backend/d
 mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" < /var/www/backend/database/migration_cash_mgmt.sql 2>/dev/null \
   && echo "migration_cash_mgmt.sql done." || echo "migration_cash_mgmt.sql had warnings (may be normal)."
 
+# Add purchase_item_id to return_items if missing
+COL_CHECK=$(mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" -e "SHOW COLUMNS FROM return_items LIKE 'purchase_item_id';" 2>/dev/null | wc -l)
+if [ "$COL_CHECK" -eq "0" ]; then
+  echo "Adding purchase_item_id column to return_items..."
+  mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" -e \
+    "ALTER TABLE return_items ADD COLUMN purchase_item_id INT NULL AFTER batch_id;" 2>/dev/null \
+    && echo "Column added." || echo "Column add failed — check logs."
+else
+  echo "return_items.purchase_item_id already exists — skipping."
+fi
+
 # Import seed data if categories table is empty
 SEED_CHECK=$(mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" -e "SELECT COUNT(*) FROM categories;" 2>/dev/null | tail -1)
 if [ "$SEED_CHECK" = "0" ] || [ -z "$SEED_CHECK" ]; then
