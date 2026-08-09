@@ -339,7 +339,7 @@ class POSController
 
         if ($sale) {
             $items = $db->prepare("
-                SELECT si.*, m.name as medicine_name, m.unit
+                SELECT si.*, m.name as medicine_name, m.name_ar as medicine_name_ar, m.unit
                 FROM sale_items si
                 JOIN medicines m ON m.id = si.medicine_id
                 WHERE si.sale_id = ?

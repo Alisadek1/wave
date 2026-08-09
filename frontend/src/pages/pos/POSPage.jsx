@@ -312,6 +312,7 @@ export default function POSPage() {
                   >
                     <div>
                       <p className="font-medium text-sm text-gray-900 dark:text-white">{med.name}</p>
+                      {med.name_ar && <p className="text-xs text-gray-500 dark:text-gray-400" dir="rtl">{med.name_ar}</p>}
                       <p className="text-xs text-gray-400">{med.barcode || med.sku} · {t('pos.stock')}: {med.current_stock}</p>
                     </div>
                     <div className="text-end">
@@ -341,6 +342,7 @@ export default function POSPage() {
                   <div className="flex items-center gap-1.5">
                     <p className="font-medium text-sm text-gray-900 dark:text-white truncate">{item.name}</p>
                   </div>
+                  {item.name_ar && <p className="text-xs text-gray-500 dark:text-gray-400 truncate" dir="rtl">{item.name_ar}</p>}
                   <p className="text-xs text-gray-400">{formatCurrency(item.unit_price)} / {t('pos.each')}</p>
                 </div>
 
@@ -637,6 +639,7 @@ export default function POSPage() {
               {lastSale.items?.map((item, i) => (
                 <div key={i}>
                   <div className="item-name">{item.medicine_name}</div>
+                  {item.medicine_name_ar && <div className="item-name" dir="rtl" style={{ fontWeight: 'normal', fontSize: '11px' }}>{item.medicine_name_ar}</div>}
                   <div className="item-detail">
                     <span>{item.quantity} × {formatCurrency(item.unit_price)}</span>
                     <span>{formatCurrency(item.subtotal)}</span>
