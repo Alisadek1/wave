@@ -93,17 +93,25 @@ else
   echo "shift_cash_movements already exists — skipping."
 fi
 
-# Ensure shifts has the extended columns added by migration_cash_mgmt
-mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" -e "
-  ALTER TABLE \`shifts\`
-    ADD COLUMN IF NOT EXISTS \`expected_cash\`  DECIMAL(12,3) DEFAULT NULL,
-    ADD COLUMN IF NOT EXISTS \`counted_cash\`   DECIMAL(12,3) DEFAULT NULL,
-    ADD COLUMN IF NOT EXISTS \`difference\`     DECIMAL(12,3) DEFAULT NULL,
-    ADD COLUMN IF NOT EXISTS \`balance_status\` ENUM('balanced','overage','shortage') DEFAULT NULL,
-    ADD COLUMN IF NOT EXISTS \`cash_refunds\`   DECIMAL(12,3) NOT NULL DEFAULT 0.000,
-    ADD COLUMN IF NOT EXISTS \`cash_in_total\`  DECIMAL(12,3) NOT NULL DEFAULT 0.000,
-    ADD COLUMN IF NOT EXISTS \`cash_out_total\` DECIMAL(12,3) NOT NULL DEFAULT 0.000;
-" 2>/dev/null && echo "shifts columns ensured." || echo "shifts ALTER TABLE had warnings."
+# Ensure shifts has extended columns — check each individually (ADD COLUMN IF NOT EXISTS
+# is MySQL 8.0.3+ only; use SHOW COLUMNS to stay compatible with older versions)
+add_shifts_col() {
+  local COL="$1" DEF="$2"
+  local EXISTS=$(mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" \
+    -e "SHOW COLUMNS FROM shifts LIKE '$COL';" 2>/dev/null | wc -l)
+  if [ "$EXISTS" -eq "0" ]; then
+    mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" \
+      -e "ALTER TABLE \`shifts\` ADD COLUMN \`$COL\` $DEF;" 2>/dev/null \
+      && echo "  shifts.$COL added." || echo "  shifts.$COL add failed."
+  fi
+}
+add_shifts_col "expected_cash"  "DECIMAL(12,3) DEFAULT NULL"
+add_shifts_col "counted_cash"   "DECIMAL(12,3) DEFAULT NULL"
+add_shifts_col "difference"     "DECIMAL(12,3) DEFAULT NULL"
+add_shifts_col "balance_status" "ENUM('balanced','overage','shortage') DEFAULT NULL"
+add_shifts_col "cash_refunds"   "DECIMAL(12,3) NOT NULL DEFAULT 0.000"
+add_shifts_col "cash_in_total"  "DECIMAL(12,3) NOT NULL DEFAULT 0.000"
+add_shifts_col "cash_out_total" "DECIMAL(12,3) NOT NULL DEFAULT 0.000"
 
 # Add purchase_item_id to return_items if missing
 COL_CHECK=$(mysql -h "$DB_H" -P "$DB_P" -u "$DB_U" -p"$DB_W" -D "$DB_N" -e "SHOW COLUMNS FROM return_items LIKE 'purchase_item_id';" 2>/dev/null | wc -l)
