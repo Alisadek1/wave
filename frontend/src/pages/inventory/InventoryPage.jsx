@@ -42,7 +42,7 @@ function AdjustForm({ medicines, onSubmit, loading }) {
         <label className="label">{t('inventory.col_medicine')} *</label>
         <select value={form.medicine_id} onChange={e => handleMedChange(e.target.value)} className="input" required>
           <option value="">{t('common.select')}</option>
-          {medicines.map(m => <option key={m.id} value={m.id}>{m.name} ({t('inventory.col_stock')}: {m.current_stock})</option>)}
+          {medicines.map(m => <option key={m.id} value={m.id}>{m.name_ar || m.name} ({t('inventory.col_stock')}: {m.current_stock})</option>)}
         </select>
       </div>
       {medBatches.length > 0 && (
