@@ -20,8 +20,8 @@ class InventoryController
         $binds = [];
 
         if ($search !== '') {
-            $where[] = '(m.name LIKE ? OR m.barcode LIKE ? OR m.sku LIKE ?)';
-            $binds   = array_merge($binds, ["%{$search}%", "%{$search}%", "%{$search}%"]);
+            $where[] = '(m.name LIKE ? OR m.name_ar LIKE ? OR m.barcode LIKE ? OR m.sku LIKE ?)';
+            $binds   = array_merge($binds, ["%{$search}%", "%{$search}%", "%{$search}%", "%{$search}%"]);
         }
 
         if ($catId > 0) {
