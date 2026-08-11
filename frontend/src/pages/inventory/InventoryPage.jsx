@@ -13,19 +13,11 @@ import { useTranslation } from 'react-i18next'
 
 function AdjustForm({ medicines, onSubmit, loading }) {
   const { t } = useTranslation()
-  const [form, setForm] = useState({ medicine_id: '', batch_id: '', type: 'add', quantity: '', reason: '', notes: '' })
-  const [medBatches, setMedBatches] = useState([])
-  const { get } = useApi()
+  const [form, setForm] = useState({ medicine_id: '', type: 'add', quantity: '', reason: '', notes: '' })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  const handleMedChange = async (id) => {
-    set('medicine_id', id); set('batch_id', '')
-    if (id) {
-      const res = await get(`/api/medicines/${id}/batches`)
-      setMedBatches(res.data || [])
-    } else {
-      setMedBatches([])
-    }
+  const handleMedChange = (id) => {
+    set('medicine_id', id)
   }
 
   const handleSubmit = (e) => {
@@ -45,15 +37,6 @@ function AdjustForm({ medicines, onSubmit, loading }) {
           {medicines.map(m => <option key={m.id} value={m.id}>{m.name_ar || m.name} ({t('inventory.col_stock')}: {m.current_stock})</option>)}
         </select>
       </div>
-      {medBatches.length > 0 && (
-        <div>
-          <label className="label">{t('inventory.batch')} ({t('common.optional_label')})</label>
-          <select value={form.batch_id} onChange={e => set('batch_id', e.target.value)} className="input">
-            <option value="">{t('inventory.all_batches')}</option>
-            {medBatches.map(b => <option key={b.id} value={b.id}>{b.batch_number} — {t('inventory.col_quantity')}: {b.quantity}</option>)}
-          </select>
-        </div>
-      )}
       <div>
         <label className="label">{t('inventory.adj_type')} *</label>
         <div className="grid grid-cols-3 gap-2">
