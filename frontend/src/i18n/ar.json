@@ -428,6 +428,8 @@
     "low_stock_items": "أصناف منخفضة المخزون",
     "out_of_stock_items": "أصناف نافد مخزونها",
     "save_failed": "فشل الحفظ",
+    "batch": "الدفعة",
+    "all_batches": "كل الدفعات",
     "required_medicine": "المنتج مطلوب",
     "required_quantity": "الكمية مطلوبة",
     "required_reason": "السبب مطلوب",

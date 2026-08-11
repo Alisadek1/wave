@@ -428,6 +428,8 @@
     "low_stock_items": "Low Stock Items",
     "out_of_stock_items": "Out of Stock Items",
     "save_failed": "Save failed",
+    "batch": "Batch",
+    "all_batches": "All Batches",
     "required_medicine": "Product is required",
     "required_quantity": "Quantity is required",
     "required_reason": "Reason is required",
