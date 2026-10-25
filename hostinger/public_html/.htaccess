@@ -1,0 +1,10 @@
+Options -MultiViews -Indexes
+RewriteEngine On
+
+# Pass Authorization header through (required for JWT)
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+# Send all non-file requests to the PHP router (handles both API and SPA)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule .* index.php [QSA,L]

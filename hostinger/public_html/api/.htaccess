@@ -1,0 +1,16 @@
+Options -MultiViews -Indexes
+RewriteEngine On
+
+# Pass Authorization header through (required for JWT)
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+# Route all requests to index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule .* index.php [QSA,L]
+
+# Security
+<Files ".env">
+    Order allow,deny
+    Deny from all
+</Files>

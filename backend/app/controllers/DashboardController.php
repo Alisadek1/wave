@@ -33,7 +33,21 @@ class DashboardController
             WHERE DATE(s.sale_date) = CURDATE() AND s.status = 'completed'
         ")->fetch();
 
-        $profit = (float)$todaySales['revenue'] - (float)($todayProfit['cost'] ?? 0);
+        // Today's sale returns — subtract from revenue & reverse cost
+        $todayReturnRevenue = (float)$db->query("
+            SELECT COALESCE(SUM(total_amount),0)
+            FROM returns WHERE type='sale' AND status='completed' AND DATE(created_at)=CURDATE()
+        ")->fetchColumn();
+        $todayReturnCost = (float)$db->query("
+            SELECT COALESCE(SUM(ri.quantity * COALESCE(mb.purchase_price, m.purchase_price)),0)
+            FROM return_items ri
+            JOIN returns r ON r.id = ri.return_id AND r.type='sale' AND r.status='completed' AND DATE(r.created_at)=CURDATE()
+            JOIN medicines m ON m.id = ri.medicine_id
+            LEFT JOIN medicine_batches mb ON mb.id = ri.batch_id
+        ")->fetchColumn();
+
+        $todaySales['revenue'] = max(0, (float)$todaySales['revenue'] - $todayReturnRevenue);
+        $profit = $todaySales['revenue'] - max(0, (float)($todayProfit['cost'] ?? 0) - $todayReturnCost);
 
         // Monthly sales (current month)
         $monthlySales = $db->query("
@@ -43,6 +57,12 @@ class DashboardController
               AND MONTH(sale_date) = MONTH(CURDATE())
               AND status = 'completed'
         ")->fetch();
+        $monthlyReturnRevenue = (float)$db->query("
+            SELECT COALESCE(SUM(total_amount),0)
+            FROM returns WHERE type='sale' AND status='completed'
+              AND YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE())
+        ")->fetchColumn();
+        $monthlySales['revenue'] = max(0, (float)$monthlySales['revenue'] - $monthlyReturnRevenue);
 
         // Low stock medicines
         $lowStock = $db->query("
@@ -127,17 +147,22 @@ class DashboardController
 
         $db = Database::getInstance();
 
-        // Last 12 months sales chart
+        // Last 12 months sales chart (net of returns)
         $monthlySalesChart = $db->query("
             SELECT
-                DATE_FORMAT(sale_date, '%Y-%m') as month,
-                DATE_FORMAT(sale_date, '%b %Y') as label,
-                COALESCE(SUM(total), 0) as revenue,
-                COUNT(*) as count
-            FROM sales
-            WHERE sale_date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
-              AND status = 'completed'
-            GROUP BY DATE_FORMAT(sale_date, '%Y-%m')
+                DATE_FORMAT(s.sale_date, '%Y-%m') as month,
+                DATE_FORMAT(s.sale_date, '%b %Y') as label,
+                GREATEST(0, COALESCE(SUM(s.total),0) - COALESCE(ret.total_returns,0)) as revenue,
+                COUNT(DISTINCT s.id) as count
+            FROM sales s
+            LEFT JOIN (
+                SELECT DATE_FORMAT(created_at,'%Y-%m') as rmonth, SUM(total_amount) as total_returns
+                FROM returns WHERE type='sale' AND status='completed'
+                GROUP BY DATE_FORMAT(created_at,'%Y-%m')
+            ) ret ON ret.rmonth = DATE_FORMAT(s.sale_date,'%Y-%m')
+            WHERE s.sale_date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+              AND s.status = 'completed'
+            GROUP BY DATE_FORMAT(s.sale_date, '%Y-%m')
             ORDER BY month ASC
         ")->fetchAll();
 
@@ -187,17 +212,23 @@ class DashboardController
             LIMIT 8
         ")->fetchAll();
 
-        // Daily sales for current month
+        // Daily sales for current month (net of returns)
         $dailySales = $db->query("
             SELECT
-                DAY(sale_date) as day,
-                COALESCE(SUM(total), 0) as revenue,
-                COUNT(*) as count
-            FROM sales
-            WHERE YEAR(sale_date) = YEAR(CURDATE())
-              AND MONTH(sale_date) = MONTH(CURDATE())
-              AND status = 'completed'
-            GROUP BY DAY(sale_date)
+                DAY(s.sale_date) as day,
+                GREATEST(0, COALESCE(SUM(s.total),0) - COALESCE(ret.total_returns,0)) as revenue,
+                COUNT(DISTINCT s.id) as count
+            FROM sales s
+            LEFT JOIN (
+                SELECT DAY(created_at) as rday, SUM(total_amount) as total_returns
+                FROM returns WHERE type='sale' AND status='completed'
+                  AND YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE())
+                GROUP BY DAY(created_at)
+            ) ret ON ret.rday = DAY(s.sale_date)
+            WHERE YEAR(s.sale_date) = YEAR(CURDATE())
+              AND MONTH(s.sale_date) = MONTH(CURDATE())
+              AND s.status = 'completed'
+            GROUP BY DAY(s.sale_date)
             ORDER BY day ASC
         ")->fetchAll();
 

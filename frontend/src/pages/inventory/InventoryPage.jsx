@@ -14,10 +14,21 @@ import { useTranslation } from 'react-i18next'
 function AdjustForm({ medicines, onSubmit, loading }) {
   const { t } = useTranslation()
   const [form, setForm] = useState({ medicine_id: '', type: 'add', quantity: '', reason: '', notes: '' })
+  const [medSearch, setMedSearch] = useState('')
+  const [medOpen, setMedOpen] = useState(false)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  const handleMedChange = (id) => {
-    set('medicine_id', id)
+  const filteredMeds = medicines.filter(m => {
+    const q = medSearch.toLowerCase()
+    return (m.name_ar || '').includes(medSearch) || (m.name || '').toLowerCase().includes(q) || (m.sku || '').toLowerCase().includes(q)
+  })
+
+  const selectedMed = medicines.find(m => m.id === form.medicine_id)
+
+  const handleMedSelect = (m) => {
+    set('medicine_id', m.id)
+    setMedSearch('')
+    setMedOpen(false)
   }
 
   const handleSubmit = (e) => {
@@ -30,12 +41,38 @@ function AdjustForm({ medicines, onSubmit, loading }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
+      <div className="relative">
         <label className="label">{t('inventory.col_medicine')} *</label>
-        <select value={form.medicine_id} onChange={e => handleMedChange(e.target.value)} className="input" required>
-          <option value="">{t('common.select')}</option>
-          {medicines.map(m => <option key={m.id} value={m.id}>{m.name_ar || m.name} ({t('inventory.col_stock')}: {m.current_stock})</option>)}
-        </select>
+        <input
+          type="text"
+          className="input"
+          placeholder={selectedMed ? (selectedMed.name_ar || selectedMed.name) : t('common.search') + '...'}
+          value={medOpen ? medSearch : ''}
+          onFocus={() => setMedOpen(true)}
+          onChange={e => { setMedSearch(e.target.value); setMedOpen(true) }}
+          onBlur={() => setTimeout(() => setMedOpen(false), 150)}
+          style={{ color: !medOpen && selectedMed ? 'inherit' : undefined }}
+        />
+        {!medOpen && selectedMed && (
+          <div className="absolute inset-0 top-6 flex items-center px-3 pointer-events-none">
+            <span className="text-sm text-gray-900 dark:text-white truncate">
+              {selectedMed.name_ar || selectedMed.name} ({t('inventory.col_stock')}: {selectedMed.current_stock})
+            </span>
+          </div>
+        )}
+        {medOpen && (
+          <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+            {filteredMeds.length === 0 ? (
+              <div className="px-3 py-2 text-sm text-gray-400">{t('common.no_results') || 'No results'}</div>
+            ) : filteredMeds.map(m => (
+              <div key={m.id} onMouseDown={() => handleMedSelect(m)}
+                className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 flex justify-between">
+                <span dir="rtl">{m.name_ar || m.name}</span>
+                <span className="text-gray-400 text-xs">{t('inventory.col_stock')}: {m.current_stock}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div>
         <label className="label">{t('inventory.adj_type')} *</label>
@@ -92,8 +129,10 @@ export default function InventoryPage() {
   useEffect(() => { load() }, [load])
 
   useEffect(() => {
-    get('/api/medicines', { per_page: 500, is_active: 1 }).then(res => setMedicines(res.data || []))
-  }, [])
+    if (modal === 'adjust') {
+      get('/api/medicines', { per_page: 1000 }).then(res => setMedicines(res.data || []))
+    }
+  }, [modal])
 
   const handleAdjust = async (form) => {
     setSaving(true)

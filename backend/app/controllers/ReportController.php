@@ -13,23 +13,44 @@ class ReportController
         $dateFrom = $_GET['date_from'] ?? date('Y-m-01');
         $dateTo   = $_GET['date_to'] ?? date('Y-m-d');
 
-        // Daily rows
+        // Daily rows (net of sale returns and expenses)
         $rowsStmt = $db->prepare("
-            SELECT DATE(sale_date) as date,
-                   COUNT(*) as invoices,
+            SELECT DATE(s.sale_date) as date,
+                   COUNT(DISTINCT s.id) as invoices,
                    (SELECT COUNT(*) FROM sale_items si2 JOIN sales s2 ON s2.id=si2.sale_id
                     WHERE DATE(s2.sale_date)=DATE(s.sale_date) AND s2.status='completed') as items_sold,
-                   COALESCE(SUM(total),0) as revenue,
-                   COALESCE(SUM(discount_amount),0) as discount,
-                   COALESCE(SUM(tax_amount),0) as tax,
-                   COALESCE(SUM(total - discount_amount - tax_amount),0) as profit
+                   GREATEST(0, COALESCE(SUM(s.total),0) - COALESCE(ret.total_returns,0)) as revenue,
+                   COALESCE(SUM(s.discount_amount),0) as discount,
+                   COALESCE(SUM(s.tax_amount),0) as tax,
+                   COALESCE(exp.total_exp, 0) as expenses,
+                   COALESCE(SUM(s.total - s.discount_amount - s.tax_amount),0) - COALESCE(ret.total_returns,0) - COALESCE(exp.total_exp, 0) as profit
             FROM sales s
-            WHERE DATE(sale_date) BETWEEN ? AND ? AND status = 'completed'
-            GROUP BY DATE(sale_date)
+            LEFT JOIN (
+                SELECT DATE(created_at) as rdate, SUM(total_amount) as total_returns
+                FROM returns WHERE type='sale' AND status='completed'
+                GROUP BY DATE(created_at)
+            ) ret ON ret.rdate = DATE(s.sale_date)
+            LEFT JOIN (
+                SELECT expense_date, SUM(amount) as total_exp
+                FROM expenses
+                GROUP BY expense_date
+            ) exp ON exp.expense_date = DATE(s.sale_date)
+            WHERE DATE(s.sale_date) BETWEEN ? AND ? AND s.status = 'completed'
+            GROUP BY DATE(s.sale_date)
             ORDER BY date ASC
         ");
         $rowsStmt->execute([$dateFrom, $dateTo]);
         $rows = $rowsStmt->fetchAll();
+
+        // Returns total for the period
+        $retStmt = $db->prepare("SELECT COALESCE(SUM(total_amount),0) FROM returns WHERE type='sale' AND status='completed' AND DATE(created_at) BETWEEN ? AND ?");
+        $retStmt->execute([$dateFrom, $dateTo]);
+        $returnsTotal = (float)$retStmt->fetchColumn();
+
+        // Expenses total for the period
+        $expStmt = $db->prepare("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE expense_date BETWEEN ? AND ?");
+        $expStmt->execute([$dateFrom, $dateTo]);
+        $expensesTotal = (float)$expStmt->fetchColumn();
 
         // Summary
         $sumStmt = $db->prepare("
@@ -41,6 +62,9 @@ class ReportController
         ");
         $sumStmt->execute([$dateFrom, $dateTo, $dateFrom, $dateTo]);
         $summary = $sumStmt->fetch();
+        $summary['revenue']  = max(0, (float)$summary['revenue'] - $returnsTotal);
+        $summary['expenses'] = $expensesTotal;
+        $summary['profit']   = (float)$summary['profit'] - $returnsTotal - $expensesTotal;
 
         // Chart data
         $chart = array_map(fn($r) => ['date' => $r['date'], 'revenue' => (float)$r['revenue']], $rows);
@@ -57,16 +81,16 @@ class ReportController
         $dateFrom = $_GET['date_from'] ?? date('Y-01-01');
         $dateTo   = $_GET['date_to'] ?? date('Y-m-d');
 
-        // Monthly rows
+        // Monthly rows (net of sale returns and expenses)
         $rowsStmt = $db->prepare("
-            SELECT DATE_FORMAT(sale_date,'%Y-%m') as month,
-                   COUNT(*) as invoices,
-                   COALESCE(SUM(total),0) as revenue,
-                   COALESCE(SUM(si_cost.cost),0) as cost,
-                   COALESCE(SUM(total),0) - COALESCE(SUM(si_cost.cost),0) as profit,
-                   CASE WHEN COALESCE(SUM(total),0) > 0
-                        THEN ROUND((COALESCE(SUM(total),0) - COALESCE(SUM(si_cost.cost),0)) / COALESCE(SUM(total),0) * 100, 2)
-                        ELSE 0 END as margin
+            SELECT DATE_FORMAT(s.sale_date,'%Y-%m') as month,
+                   COUNT(DISTINCT s.id) as invoices,
+                   GREATEST(0, COALESCE(SUM(s.total),0) - COALESCE(ret.total_returns,0)) as revenue,
+                   GREATEST(0, COALESCE(SUM(si_cost.cost),0) - COALESCE(ret_cost.cost,0)) as cost,
+                   COALESCE(exp.total_exp, 0) as expenses,
+                   GREATEST(0, COALESCE(SUM(s.total),0) - COALESCE(ret.total_returns,0))
+                     - GREATEST(0, COALESCE(SUM(si_cost.cost),0) - COALESCE(ret_cost.cost,0))
+                     - COALESCE(exp.total_exp, 0) as profit
             FROM sales s
             LEFT JOIN (
                 SELECT si.sale_id, SUM(si.quantity * COALESCE(mb.purchase_price, m.purchase_price)) as cost
@@ -75,12 +99,52 @@ class ReportController
                 LEFT JOIN medicine_batches mb ON mb.id = si.batch_id
                 GROUP BY si.sale_id
             ) si_cost ON si_cost.sale_id = s.id
-            WHERE DATE(sale_date) BETWEEN ? AND ? AND s.status = 'completed'
-            GROUP BY DATE_FORMAT(sale_date,'%Y-%m')
+            LEFT JOIN (
+                SELECT DATE_FORMAT(created_at,'%Y-%m') as rmonth, SUM(total_amount) as total_returns
+                FROM returns WHERE type='sale' AND status='completed'
+                GROUP BY DATE_FORMAT(created_at,'%Y-%m')
+            ) ret ON ret.rmonth = DATE_FORMAT(s.sale_date,'%Y-%m')
+            LEFT JOIN (
+                SELECT DATE_FORMAT(r.created_at,'%Y-%m') as rmonth,
+                       SUM(ri.quantity * COALESCE(mb2.purchase_price, m2.purchase_price)) as cost
+                FROM return_items ri
+                JOIN returns r ON r.id = ri.return_id AND r.type='sale' AND r.status='completed'
+                JOIN medicines m2 ON m2.id = ri.medicine_id
+                LEFT JOIN medicine_batches mb2 ON mb2.id = ri.batch_id
+                GROUP BY DATE_FORMAT(r.created_at,'%Y-%m')
+            ) ret_cost ON ret_cost.rmonth = DATE_FORMAT(s.sale_date,'%Y-%m')
+            LEFT JOIN (
+                SELECT DATE_FORMAT(expense_date,'%Y-%m') as emonth, SUM(amount) as total_exp
+                FROM expenses
+                GROUP BY DATE_FORMAT(expense_date,'%Y-%m')
+            ) exp ON exp.emonth = DATE_FORMAT(s.sale_date,'%Y-%m')
+            WHERE DATE(s.sale_date) BETWEEN ? AND ? AND s.status = 'completed'
+            GROUP BY DATE_FORMAT(s.sale_date,'%Y-%m')
             ORDER BY month ASC
         ");
         $rowsStmt->execute([$dateFrom, $dateTo]);
-        $rows = $rowsStmt->fetchAll();
+        $rawRows = $rowsStmt->fetchAll();
+        $rows = array_map(fn($r) => array_merge($r, [
+            'margin' => (float)$r['revenue'] > 0 ? round(((float)$r['profit'] / (float)$r['revenue']) * 100, 2) : 0,
+        ]), $rawRows);
+
+        $retStmt2 = $db->prepare("SELECT COALESCE(SUM(total_amount),0) FROM returns WHERE type='sale' AND status='completed' AND DATE(created_at) BETWEEN ? AND ?");
+        $retStmt2->execute([$dateFrom, $dateTo]);
+        $returnsTotal2 = (float)$retStmt2->fetchColumn();
+
+        $retCostStmt = $db->prepare("
+            SELECT COALESCE(SUM(ri.quantity * COALESCE(mb.purchase_price, m.purchase_price)),0)
+            FROM return_items ri
+            JOIN returns r ON r.id = ri.return_id AND r.type='sale' AND r.status='completed' AND DATE(r.created_at) BETWEEN ? AND ?
+            JOIN medicines m ON m.id = ri.medicine_id
+            LEFT JOIN medicine_batches mb ON mb.id = ri.batch_id
+        ");
+        $retCostStmt->execute([$dateFrom, $dateTo]);
+        $returnsCost2 = (float)$retCostStmt->fetchColumn();
+
+        $expStmt2 = $db->prepare("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE expense_date BETWEEN ? AND ?");
+        $expStmt2->execute([$dateFrom, $dateTo]);
+        $expensesTotal2 = (float)$expStmt2->fetchColumn();
 
         $sumStmt = $db->prepare("
             SELECT COUNT(*) as total_sales, COALESCE(SUM(total),0) as revenue,
@@ -95,6 +159,9 @@ class ReportController
         ");
         $sumStmt->execute([$dateFrom, $dateTo]);
         $summary = $sumStmt->fetch();
+        $summary['revenue']  = max(0, (float)$summary['revenue'] - $returnsTotal2);
+        $summary['expenses'] = $expensesTotal2;
+        $summary['profit']   = (float)$summary['profit'] - ($returnsTotal2 - $returnsCost2) - $expensesTotal2;
 
         Response::success(compact('summary', 'rows'));
     }
@@ -108,16 +175,39 @@ class ReportController
         $dateFrom = $_GET['date_from'] ?? date('Y-m-01');
         $dateTo   = $_GET['date_to'] ?? date('Y-m-d');
 
+        // Per-day profit net of sale returns and expenses
         $stmt = $db->prepare("
             SELECT
                 DATE(s.sale_date) as date,
-                SUM(si.subtotal) as revenue,
-                COALESCE(SUM(si.quantity * COALESCE(mb.purchase_price, m.purchase_price)), 0) as cost,
-                SUM(si.subtotal) - COALESCE(SUM(si.quantity * COALESCE(mb.purchase_price, m.purchase_price)), 0) as profit
+                GREATEST(0, SUM(si.subtotal) - COALESCE(ret_rev.amount,0)) as revenue,
+                GREATEST(0, COALESCE(SUM(si.quantity * COALESCE(mb.purchase_price, m.purchase_price)),0) - COALESCE(ret_cost.cost,0)) as cost,
+                COALESCE(exp.total_exp, 0) as expenses,
+                GREATEST(0, SUM(si.subtotal) - COALESCE(ret_rev.amount,0))
+                  - GREATEST(0, COALESCE(SUM(si.quantity * COALESCE(mb.purchase_price, m.purchase_price)),0) - COALESCE(ret_cost.cost,0))
+                  - COALESCE(exp.total_exp, 0) as profit
             FROM sale_items si
             JOIN sales s ON s.id = si.sale_id AND s.status = 'completed'
             JOIN medicines m ON m.id = si.medicine_id
             LEFT JOIN medicine_batches mb ON mb.id = si.batch_id
+            LEFT JOIN (
+                SELECT DATE(r.created_at) as rdate, SUM(ri2.subtotal) as amount
+                FROM return_items ri2 JOIN returns r ON r.id = ri2.return_id AND r.type='sale' AND r.status='completed'
+                GROUP BY DATE(r.created_at)
+            ) ret_rev ON ret_rev.rdate = DATE(s.sale_date)
+            LEFT JOIN (
+                SELECT DATE(r.created_at) as rdate,
+                       SUM(ri2.quantity * COALESCE(mb2.purchase_price, m2.purchase_price)) as cost
+                FROM return_items ri2
+                JOIN returns r ON r.id = ri2.return_id AND r.type='sale' AND r.status='completed'
+                JOIN medicines m2 ON m2.id = ri2.medicine_id
+                LEFT JOIN medicine_batches mb2 ON mb2.id = ri2.batch_id
+                GROUP BY DATE(r.created_at)
+            ) ret_cost ON ret_cost.rdate = DATE(s.sale_date)
+            LEFT JOIN (
+                SELECT expense_date, SUM(amount) as total_exp
+                FROM expenses
+                GROUP BY expense_date
+            ) exp ON exp.expense_date = DATE(s.sale_date)
             WHERE DATE(s.sale_date) BETWEEN ? AND ?
             GROUP BY DATE(s.sale_date)
             ORDER BY date ASC
@@ -128,8 +218,7 @@ class ReportController
         $summaryStmt = $db->prepare("
             SELECT
                 COALESCE(SUM(si.subtotal), 0) as revenue,
-                COALESCE(SUM(si.quantity * COALESCE(mb.purchase_price, m.purchase_price)), 0) as cost,
-                COALESCE(SUM(si.subtotal), 0) - COALESCE(SUM(si.quantity * COALESCE(mb.purchase_price, m.purchase_price)), 0) as profit
+                COALESCE(SUM(si.quantity * COALESCE(mb.purchase_price, m.purchase_price)), 0) as cost
             FROM sale_items si
             JOIN sales s ON s.id = si.sale_id AND s.status = 'completed'
             JOIN medicines m ON m.id = si.medicine_id
@@ -137,16 +226,39 @@ class ReportController
             WHERE DATE(s.sale_date) BETWEEN ? AND ?
         ");
         $summaryStmt->execute([$dateFrom, $dateTo]);
-        $s = $summaryStmt->fetch();
+        $sRow = $summaryStmt->fetch();
+
+        $profRetRev = $db->prepare("SELECT COALESCE(SUM(ri.subtotal),0) FROM return_items ri JOIN returns r ON r.id=ri.return_id AND r.type='sale' AND r.status='completed' AND DATE(r.created_at) BETWEEN ? AND ?");
+        $profRetRev->execute([$dateFrom, $dateTo]);
+        $retRevTotal = (float)$profRetRev->fetchColumn();
+
+        $profRetCost = $db->prepare("
+            SELECT COALESCE(SUM(ri.quantity * COALESCE(mb.purchase_price, m.purchase_price)),0)
+            FROM return_items ri
+            JOIN returns r ON r.id=ri.return_id AND r.type='sale' AND r.status='completed' AND DATE(r.created_at) BETWEEN ? AND ?
+            JOIN medicines m ON m.id=ri.medicine_id
+            LEFT JOIN medicine_batches mb ON mb.id=ri.batch_id
+        ");
+        $profRetCost->execute([$dateFrom, $dateTo]);
+        $retCostTotal = (float)$profRetCost->fetchColumn();
+
+        $expStmt3 = $db->prepare("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE expense_date BETWEEN ? AND ?");
+        $expStmt3->execute([$dateFrom, $dateTo]);
+        $expensesTotal3 = (float)$expStmt3->fetchColumn();
+
+        $netRevenue = max(0, (float)$sRow['revenue'] - $retRevTotal);
+        $netCost    = max(0, (float)$sRow['cost']    - $retCostTotal);
+        $netProfit  = $netRevenue - $netCost - $expensesTotal3;
         $summary = [
-            'revenue' => (float)$s['revenue'],
-            'cost'    => (float)$s['cost'],
-            'profit'  => (float)$s['profit'],
-            'margin'  => $s['revenue'] > 0 ? round(($s['profit'] / $s['revenue']) * 100, 2) : 0,
+            'revenue'  => $netRevenue,
+            'cost'     => $netCost,
+            'expenses' => $expensesTotal3,
+            'profit'   => $netProfit,
+            'margin'   => $netRevenue > 0 ? round(($netProfit / $netRevenue) * 100, 2) : 0,
         ];
 
         $rows = array_map(fn($r) => array_merge($r, [
-            'margin' => $r['revenue'] > 0 ? round(($r['profit'] / $r['revenue']) * 100, 2) : 0
+            'margin' => (float)$r['revenue'] > 0 ? round(((float)$r['profit'] / (float)$r['revenue']) * 100, 2) : 0
         ]), $daily);
 
         Response::success(compact('summary', 'rows'));
@@ -283,9 +395,31 @@ class ReportController
             WHERE DATE(sale_date) = ? AND status = 'completed'
         ");
         $stmt->execute([$date]);
+        $row = $stmt->fetch();
 
-        $row     = $stmt->fetch();
-        $rows    = [['date' => $_GET['date'] ?? date('Y-m-d'), 'cash_in' => $row['total_sales'], 'cash_out' => 0, 'net' => $row['total_cash'] - $row['total_change']]];
+        // Subtract sale returns for this date
+        $retRow = $db->prepare("
+            SELECT COALESCE(SUM(cash_amount),0) as ret_cash,
+                   COALESCE(SUM(visa_amount),0) as ret_visa,
+                   COALESCE(SUM(wallet_amount),0) as ret_wallet,
+                   COALESCE(SUM(total_amount),0) as ret_total
+            FROM returns WHERE type='sale' AND status='completed' AND DATE(created_at)=?
+        ");
+        $retRow->execute([$date]);
+        $ret = $retRow->fetch();
+
+        $row['total_sales'] = max(0, (float)$row['total_sales'] - (float)$ret['ret_total']);
+        $row['total_cash']  = max(0, (float)$row['total_cash']  - (float)$ret['ret_cash']);
+        $row['total_visa']  = max(0, (float)$row['total_visa']  - (float)$ret['ret_visa']);
+        $row['total_wallet']= max(0, (float)$row['total_wallet']- (float)$ret['ret_wallet']);
+
+        // Cash expense outflows for this date
+        $expCash = $db->prepare("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE payment_method='cash' AND expense_date=?");
+        $expCash->execute([$date]);
+        $cashExpenses = (float)$expCash->fetchColumn();
+        $row['total_expenses'] = $cashExpenses;
+
+        $rows    = [['date' => $date, 'cash_in' => $row['total_sales'], 'cash_out' => $cashExpenses, 'net' => $row['total_cash'] - (float)$row['total_change'] - $cashExpenses]];
         $summary = $row;
         Response::success(compact('summary', 'rows'));
     }

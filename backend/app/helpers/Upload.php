@@ -27,7 +27,13 @@ class Upload
 
         $ext      = pathinfo($file['name'], PATHINFO_EXTENSION);
         $filename = bin2hex(random_bytes(16)) . '.' . strtolower($ext);
-        $dir      = __DIR__ . '/../../uploads/' . $folder . '/';
+
+        // UPLOAD_DIR env var lets Hostinger (or any host) point uploads to a public directory.
+        // Falls back to the default path relative to this file for local/Docker use.
+        $uploadBase = $_ENV['UPLOAD_DIR'] ?? null;
+        $dir = $uploadBase
+            ? rtrim($uploadBase, '/') . '/' . $folder . '/'
+            : __DIR__ . '/../../uploads/' . $folder . '/';
 
         if (!is_dir($dir)) {
             mkdir($dir, 0755, true);

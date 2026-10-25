@@ -83,10 +83,11 @@ function SalesDailyReport({ data }) {
   const { summary = {}, rows = [], chart = [] } = data
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         <SummaryCard label="Total Sales" value={summary.total_sales ?? 0} color="blue" />
         <SummaryCard label="Revenue" value={formatCurrency(summary.revenue)} color="green" />
-        <SummaryCard label="Profit" value={formatCurrency(summary.profit)} color="emerald" />
+        <SummaryCard label="Expenses" value={formatCurrency(summary.expenses)} color="orange" />
+        <SummaryCard label="Net Profit" value={formatCurrency(summary.profit)} color="emerald" />
         <SummaryCard label="Returns" value={summary.returns ?? 0} color="red" />
       </div>
       {chart.length > 0 && (
@@ -117,7 +118,8 @@ function SalesDailyReport({ data }) {
           { key: 'revenue', label: 'Revenue', render: v => formatCurrency(v) },
           { key: 'discount', label: 'Discount', render: v => formatCurrency(v) },
           { key: 'tax', label: 'Tax', render: v => formatCurrency(v) },
-          { key: 'profit', label: 'Profit', render: v => <span className="text-green-600 font-semibold">{formatCurrency(v)}</span> },
+          { key: 'expenses', label: 'Expenses', render: v => <span className="text-orange-600">{formatCurrency(v)}</span> },
+          { key: 'profit', label: 'Net Profit', render: v => <span className={`font-semibold ${parseFloat(v) >= 0 ? 'text-green-600' : 'text-red-500'}`}>{formatCurrency(v)}</span> },
         ]}
         rows={rows}
       />
@@ -129,9 +131,10 @@ function SalesMonthlyReport({ data }) {
   const { summary = {}, rows = [] } = data
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <SummaryCard label="Total Revenue" value={formatCurrency(summary.revenue)} color="blue" />
-        <SummaryCard label="Total Profit" value={formatCurrency(summary.profit)} color="green" />
+        <SummaryCard label="Expenses" value={formatCurrency(summary.expenses)} color="orange" />
+        <SummaryCard label="Net Profit" value={formatCurrency(summary.profit)} color="green" />
         <SummaryCard label="Total Invoices" value={summary.total_sales ?? 0} color="indigo" />
       </div>
       {rows.length > 0 && (
@@ -155,7 +158,8 @@ function SalesMonthlyReport({ data }) {
           { key: 'invoices', label: 'Invoices' },
           { key: 'revenue', label: 'Revenue', render: v => formatCurrency(v) },
           { key: 'cost', label: 'Pharmacist Price', render: v => formatCurrency(v) },
-          { key: 'profit', label: 'Profit', render: v => <span className="text-green-600 font-semibold">{formatCurrency(v)}</span> },
+          { key: 'expenses', label: 'Expenses', render: v => <span className="text-orange-600">{formatCurrency(v)}</span> },
+          { key: 'profit', label: 'Net Profit', render: v => <span className={`font-semibold ${parseFloat(v) >= 0 ? 'text-green-600' : 'text-red-500'}`}>{formatCurrency(v)}</span> },
           { key: 'margin', label: 'Margin', render: v => `${parseFloat(v || 0).toFixed(1)}%` },
         ]}
         rows={rows}
@@ -168,10 +172,11 @@ function ProfitReport({ data }) {
   const { summary = {}, rows = [] } = data
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         <SummaryCard label="Revenue" value={formatCurrency(summary.revenue)} color="blue" />
         <SummaryCard label="Cost" value={formatCurrency(summary.cost)} color="red" />
-        <SummaryCard label="Gross Profit" value={formatCurrency(summary.profit)} color="green" />
+        <SummaryCard label="Expenses" value={formatCurrency(summary.expenses)} color="orange" />
+        <SummaryCard label="Net Profit" value={formatCurrency(summary.profit)} color="green" />
         <SummaryCard label="Margin" value={`${parseFloat(summary.margin || 0).toFixed(1)}%`} color="emerald" />
       </div>
       <ReportTable
@@ -179,7 +184,8 @@ function ProfitReport({ data }) {
           { key: 'date', label: 'Date', render: v => formatDate(v) },
           { key: 'revenue', label: 'Revenue', render: v => formatCurrency(v) },
           { key: 'cost', label: 'Pharmacist Price', render: v => formatCurrency(v) },
-          { key: 'profit', label: 'Profit', render: v => <span className={`font-semibold ${parseFloat(v) >= 0 ? 'text-green-600' : 'text-red-500'}`}>{formatCurrency(v)}</span> },
+          { key: 'expenses', label: 'Expenses', render: v => <span className="text-orange-600">{formatCurrency(v)}</span> },
+          { key: 'profit', label: 'Net Profit', render: v => <span className={`font-semibold ${parseFloat(v) >= 0 ? 'text-green-600' : 'text-red-500'}`}>{formatCurrency(v)}</span> },
           { key: 'margin', label: 'Margin %', render: v => `${parseFloat(v || 0).toFixed(1)}%` },
         ]}
         rows={rows}

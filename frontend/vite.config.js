@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: process.env.VITE_BASE_PATH || '/boss/public/',
+  base: process.env.VITE_BASE_PATH || '/',
   server: {
     port: 5173,
     proxy: {
@@ -16,7 +16,7 @@ export default defineConfig({
   },
   build: {
     outDir: '../public',
-    emptyOutDir: false,
+    emptyOutDir: true,
     sourcemap: false,
   },
 })

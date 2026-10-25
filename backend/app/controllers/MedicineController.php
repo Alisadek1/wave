@@ -11,7 +11,7 @@ class MedicineController
 
         $db      = Database::getInstance();
         $page    = max(1, (int)($_GET['page'] ?? 1));
-        $perPage = min(100, max(10, (int)($_GET['per_page'] ?? 20)));
+        $perPage = min(2000, max(10, (int)($_GET['per_page'] ?? 20)));
         $search  = trim($_GET['search'] ?? '');
         $catId   = (int)($_GET['category_id'] ?? 0);
         $compId  = (int)($_GET['company_id'] ?? 0);
